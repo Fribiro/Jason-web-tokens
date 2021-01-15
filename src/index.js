@@ -32,3 +32,18 @@ server.use(express.urlencoded({ extended: true }));//support urlencoded bodies
 server.listen(process.env.PORT, () =>
     console.log(`Server listenng on port ${process.env.PORT}`),
 ); 
+
+//Register a user
+server.post('/register', async (req, res) => {
+    const { email, password } = req.body;
+
+    try {
+        //check if user exists
+
+        const hashedPassword = await hash(password, 10);
+        console.log(hashedPassword);
+
+    } catch (err) {
+        
+    }
+})
