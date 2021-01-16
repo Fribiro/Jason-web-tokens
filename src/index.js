@@ -13,7 +13,8 @@ const {
     
     } = require('./tokens.js')
 
-const {fakeDB} = require('./fakeDB')
+const {fakeDB} = require('./fakeDB');
+const { isAuth } = require('./isAuth');
 
 //Register a user
 //Login a user
@@ -99,21 +100,59 @@ server.post('/login', async (req, res) => {
 });
 
 //logout user
-server.post('./logout', (_req, res) => {
-    res.clearCookie('refreshtoken');
+server.post('/logout', (_req, res) => {
+    res.clearCookie('refreshtoken', { path: '/refresh_token' });
     return res.send({
-        message: 'LOgged out',
-    })
-})
+        message: 'Logged out',
+    });
+});
 
 //protected route
 server.post('/protected', async (req, res) => {
     try {
-        const userId = isAuth(req)
+        const userId = isAuth(req);
+        if (userId != null ) {
+            res.send ({
+                data: 'This is protected data.',
+            })
+        }
     } catch (err) {
-        
+        res.send ({
+            error: `${err.message}`,
+        })
     }
 })
+
+//get a new access token with a refresh token
+server.post('/refresh_token', (req, res) => {
+    const token = req.cookies.refreshtoken;
+    //if we don't have a token in our request
+    if (!token) return res.send({ accesstoken: '' });
+    //if we have a token, verify it
+    let payload = null;
+    try {
+        payload = verify(token, process.env.REFRESH_TOKEN_SECRET);
+    } catch (err) {
+        return res.send({ accesstoken: '' });
+    }
+    //if the token is valid, check if the user exists
+    const user = fakeDB.find(user => user.id === payload.userId);
+    if (!user) return res.send({ accesstoken: '' });
+    //if the user exists check if a refreshtoken exists n the user
+    if (user.refreshtoken !== token ) {
+        return res.send({ accesstoken: ''});
+    }
+    //token exists, create new refresh and access token
+    //*refactor code to avoid repetitiveness
+    const accesstoken = createAccessToken(user.id);
+    const refreshtoken = createRefreshToken(user.id);
+    user.refreshtoken = refreshtoken;
+
+    //send new refresh and accestoken
+    sendRefreshToken(res, refreshtoken);
+    return res.send({ accesstoken });
+
+});
 
 server.listen(process.env.PORT, () =>
     console.log(`Server listenng on port ${process.env.PORT}`),
